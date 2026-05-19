@@ -10,19 +10,40 @@ type PreserveRule string
 
 // Synthesize builds a config document from source and preserved target blocks.
 func Synthesize(source, target Document, preserve []PreserveRule) Document {
-	var blocks []Block
+	var sourceBlocks []Block
+	var preservedRoot []Block
+	var preservedTables []Block
+
 	for _, block := range source.Blocks {
 		if block.matchesAny(preserve) {
 			continue
 		}
-		blocks = append(blocks, block)
+		sourceBlocks = append(sourceBlocks, block)
 	}
 	for _, block := range target.Blocks {
 		if !block.matchesAny(preserve) {
 			continue
 		}
-		blocks = append(blocks, block)
+		if block.RootKV {
+			preservedRoot = append(preservedRoot, block)
+			continue
+		}
+		preservedTables = append(preservedTables, block)
 	}
+
+	insertAt := len(sourceBlocks)
+	for i, block := range sourceBlocks {
+		if len(block.Path) > 0 {
+			insertAt = i
+			break
+		}
+	}
+
+	blocks := make([]Block, 0, len(sourceBlocks)+len(preservedRoot)+len(preservedTables))
+	blocks = append(blocks, sourceBlocks[:insertAt]...)
+	blocks = append(blocks, preservedRoot...)
+	blocks = append(blocks, sourceBlocks[insertAt:]...)
+	blocks = append(blocks, preservedTables...)
 	return Document{Blocks: blocks}
 }
 
