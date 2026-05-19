@@ -36,6 +36,7 @@ func ParseDocument(r io.Reader) (Document, error) {
 	var blocks []Block
 	var pending []string
 	var current *Block
+	multilineDepth := 0
 
 	flushCurrent := func() {
 		if current == nil {
@@ -56,7 +57,7 @@ func ParseDocument(r io.Reader) (Document, error) {
 		line := scanner.Text() + "\n"
 		trimmed := strings.TrimSpace(line)
 
-		if isTableHeader(trimmed) {
+		if multilineDepth == 0 && isTableHeader(trimmed) {
 			flushCurrent()
 			flushPending()
 
@@ -68,19 +69,23 @@ func ParseDocument(r io.Reader) (Document, error) {
 			continue
 		}
 
-		if key, ok := parseRootKey(trimmed); ok && (current == nil || current.RootKV) {
-			flushCurrent()
-			current = &Block{
-				Key:    key,
-				Text:   strings.Join(append(pending, line), ""),
-				RootKV: true,
+		if multilineDepth == 0 {
+			if key, ok := parseRootKey(trimmed); ok && (current == nil || current.RootKV) {
+				flushCurrent()
+				current = &Block{
+					Key:    key,
+					Text:   strings.Join(append(pending, line), ""),
+					RootKV: true,
+				}
+				pending = nil
+				multilineDepth += bracketDelta(trimmed)
+				continue
 			}
-			pending = nil
-			continue
 		}
 
 		if current != nil {
 			current.Text += line
+			multilineDepth += bracketDelta(trimmed)
 			continue
 		}
 
@@ -115,42 +120,101 @@ func parseHeaderPath(trimmed string) ([]string, error) {
 func tableHeaderContent(trimmed string) (string, int, bool) {
 	switch {
 	case strings.HasPrefix(trimmed, "[["):
-		content, end, ok := bracketContent(trimmed, 2, true)
-		return content, end, ok
+		return bracketContent(trimmed, 2, true)
 	case strings.HasPrefix(trimmed, "["):
-		content, end, ok := bracketContent(trimmed, 1, false)
-		return content, end, ok
+		return bracketContent(trimmed, 1, false)
 	default:
 		return "", 0, false
 	}
 }
 
 func bracketContent(input string, start int, arrayTable bool) (string, int, bool) {
-	inQuote := false
+	quote := rune(0)
 	escaped := false
-	for i := start; i < len(input); i++ {
+	for i, r := range input {
+		if i < start {
+			continue
+		}
 		switch {
 		case escaped:
 			escaped = false
-		case input[i] == '\\' && inQuote:
+		case r == '\\' && quote == '"':
 			escaped = true
-		case input[i] == '"':
-			inQuote = !inQuote
-		case input[i] == ']' && !inQuote && arrayTable:
+		case r == '"' && quote == 0:
+			quote = r
+		case r == '"' && quote == r:
+			quote = 0
+		case r == '\'' && quote == 0:
+			quote = r
+		case r == '\'' && quote == r:
+			quote = 0
+		case r == ']' && quote == 0 && arrayTable:
 			if i+1 < len(input) && input[i+1] == ']' {
 				return input[start:i], i + 2, true
 			}
-		case input[i] == ']' && !inQuote:
+		case r == ']' && quote == 0:
 			return input[start:i], i + 1, true
 		}
 	}
 	return "", 0, false
 }
 
+func bracketDelta(line string) int {
+	line = stripComment(line)
+	quote := rune(0)
+	escaped := false
+	depth := 0
+	for _, r := range line {
+		switch {
+		case escaped:
+			escaped = false
+		case r == '\\' && quote == '"':
+			escaped = true
+		case r == '"' && quote == 0:
+			quote = r
+		case r == '"' && quote == r:
+			quote = 0
+		case r == '\'' && quote == 0:
+			quote = r
+		case r == '\'' && quote == r:
+			quote = 0
+		case r == '[' && quote == 0:
+			depth++
+		case r == ']' && quote == 0:
+			depth--
+		}
+	}
+	return depth
+}
+
+func stripComment(line string) string {
+	quote := rune(0)
+	escaped := false
+	for i, r := range line {
+		switch {
+		case escaped:
+			escaped = false
+		case r == '\\' && quote == '"':
+			escaped = true
+		case r == '"' && quote == 0:
+			quote = r
+		case r == '"' && quote == r:
+			quote = 0
+		case r == '\'' && quote == 0:
+			quote = r
+		case r == '\'' && quote == r:
+			quote = 0
+		case r == '#' && quote == 0:
+			return line[:i]
+		}
+	}
+	return line
+}
+
 func splitTOMLPath(path string) ([]string, error) {
 	var parts []string
 	var b strings.Builder
-	inQuote := false
+	quote := rune(0)
 	escaped := false
 
 	for _, r := range path {
@@ -158,11 +222,17 @@ func splitTOMLPath(path string) ([]string, error) {
 		case escaped:
 			b.WriteRune(r)
 			escaped = false
-		case r == '\\' && inQuote:
+		case r == '\\' && quote == '"':
 			escaped = true
-		case r == '"':
-			inQuote = !inQuote
-		case r == '.' && !inQuote:
+		case r == '"' && quote == 0:
+			quote = r
+		case r == '"' && quote == r:
+			quote = 0
+		case r == '\'' && quote == 0:
+			quote = r
+		case r == '\'' && quote == r:
+			quote = 0
+		case r == '.' && quote == 0:
 			part := strings.TrimSpace(b.String())
 			if part == "" {
 				return nil, fmt.Errorf("invalid TOML path: %s", path)
@@ -173,7 +243,7 @@ func splitTOMLPath(path string) ([]string, error) {
 			b.WriteRune(r)
 		}
 	}
-	if inQuote {
+	if quote != 0 {
 		return nil, fmt.Errorf("unterminated quote in TOML path: %s", path)
 	}
 	part := strings.TrimSpace(b.String())

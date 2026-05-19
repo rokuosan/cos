@@ -41,7 +41,7 @@ model = "new"
 func TestBracketedValueLineIsNotTableHeader(t *testing.T) {
 	doc := parseDoc(t, `[projects."/repo"]
 tags = [
-  ["tag"],
+  ["tag"]
 ]
 trust_level = "trusted"
 `)
@@ -53,6 +53,20 @@ trust_level = "trusted"
 	}
 	if !strings.Contains(doc.Blocks[0].Text, `trust_level = "trusted"`) {
 		t.Fatalf("trust_level was split out of the project block: %#v", doc.Blocks[0])
+	}
+}
+
+func TestSingleQuotedTablePath(t *testing.T) {
+	doc := parseDoc(t, `[projects.'\\?\D:\repo.with.dots']
+trust_level = "trusted"
+`)
+	if len(doc.Blocks) != 1 {
+		t.Fatalf("expected one block, got %d", len(doc.Blocks))
+	}
+	got := strings.Join(doc.Blocks[0].Path, "|")
+	want := `projects|\\?\D:\repo.with.dots`
+	if got != want {
+		t.Fatalf("unexpected path: want %q got %q", want, got)
 	}
 }
 

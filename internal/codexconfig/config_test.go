@@ -11,7 +11,7 @@ func TestProjectsReturnsCodexProjectEntries(t *testing.T) {
 
 [projects."/Users/example/repo"]
 tags = [
-  ["tag"],
+  ["tag"]
 ]
 trust_level = "trusted"
 
