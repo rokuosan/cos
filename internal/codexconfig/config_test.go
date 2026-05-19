@@ -10,6 +10,9 @@ func TestProjectsReturnsCodexProjectEntries(t *testing.T) {
 	cfg := Config{Document: parseDoc(t, `model = "gpt-5.5"
 
 [projects."/Users/example/repo"]
+tags = [
+  ["tag"],
+]
 trust_level = "trusted"
 
 [projects."/Users/example/other"]

@@ -38,6 +38,24 @@ model = "new"
 	}
 }
 
+func TestBracketedValueLineIsNotTableHeader(t *testing.T) {
+	doc := parseDoc(t, `[projects."/repo"]
+tags = [
+  ["tag"],
+]
+trust_level = "trusted"
+`)
+	if len(doc.Blocks) != 1 {
+		t.Fatalf("expected one block, got %d", len(doc.Blocks))
+	}
+	if doc.Blocks[0].Path[0] != "projects" || doc.Blocks[0].Path[1] != "/repo" {
+		t.Fatalf("unexpected table path: %#v", doc.Blocks[0].Path)
+	}
+	if !strings.Contains(doc.Blocks[0].Text, `trust_level = "trusted"`) {
+		t.Fatalf("trust_level was split out of the project block: %#v", doc.Blocks[0])
+	}
+}
+
 func parseDoc(t *testing.T, input string) Document {
 	t.Helper()
 	doc, err := ParseDocument(strings.NewReader(input))

@@ -96,23 +96,55 @@ func ParseDocument(r io.Reader) (Document, error) {
 }
 
 func isTableHeader(trimmed string) bool {
-	return strings.HasPrefix(trimmed, "[") && strings.Contains(trimmed, "]")
+	_, end, ok := tableHeaderContent(trimmed)
+	if !ok {
+		return false
+	}
+	rest := strings.TrimSpace(trimmed[end:])
+	return rest == "" || strings.HasPrefix(rest, "#")
 }
 
 func parseHeaderPath(trimmed string) ([]string, error) {
-	if strings.HasPrefix(trimmed, "[[") {
-		end := strings.Index(trimmed, "]]")
-		if end < 0 {
-			return nil, fmt.Errorf("invalid TOML array table header: %s", trimmed)
-		}
-		return splitTOMLPath(trimmed[2:end])
-	}
-
-	end := strings.Index(trimmed, "]")
-	if end < 0 {
+	content, _, ok := tableHeaderContent(trimmed)
+	if !ok {
 		return nil, fmt.Errorf("invalid TOML table header: %s", trimmed)
 	}
-	return splitTOMLPath(trimmed[1:end])
+	return splitTOMLPath(content)
+}
+
+func tableHeaderContent(trimmed string) (string, int, bool) {
+	switch {
+	case strings.HasPrefix(trimmed, "[["):
+		content, end, ok := bracketContent(trimmed, 2, true)
+		return content, end, ok
+	case strings.HasPrefix(trimmed, "["):
+		content, end, ok := bracketContent(trimmed, 1, false)
+		return content, end, ok
+	default:
+		return "", 0, false
+	}
+}
+
+func bracketContent(input string, start int, arrayTable bool) (string, int, bool) {
+	inQuote := false
+	escaped := false
+	for i := start; i < len(input); i++ {
+		switch {
+		case escaped:
+			escaped = false
+		case input[i] == '\\' && inQuote:
+			escaped = true
+		case input[i] == '"':
+			inQuote = !inQuote
+		case input[i] == ']' && !inQuote && arrayTable:
+			if i+1 < len(input) && input[i+1] == ']' {
+				return input[start:i], i + 2, true
+			}
+		case input[i] == ']' && !inQuote:
+			return input[start:i], i + 1, true
+		}
+	}
+	return "", 0, false
 }
 
 func splitTOMLPath(path string) ([]string, error) {
