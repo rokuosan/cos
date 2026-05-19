@@ -9,4 +9,4 @@ run = "golangci-lint fmt ./..."
 run = "golangci-lint run"
 
 [tasks.test]
-run = "go test -v ./..."
+run = "go test -v -cover ./..."
