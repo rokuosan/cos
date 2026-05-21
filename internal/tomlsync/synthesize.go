@@ -16,7 +16,6 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	var mergedRoot []Block
 	var mergedTables []Block
 	seenRoot := map[string]struct{}{}
-	seenTables := map[string]struct{}{}
 	consumedTables := map[string]int{}
 
 	for _, block := range sourceIndex.rootOrder {
@@ -45,7 +44,6 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 
 	for _, block := range sourceIndex.tableOrder {
 		pathKey := blockPathKey(block.Path)
-		seenTables[pathKey] = struct{}{}
 		targetBlock, hasTarget := targetIndex.nextTable(pathKey)
 
 		switch {
@@ -221,11 +219,11 @@ func (s *tableParseState) consumeLine(line string) {
 	escaped := false
 	for i := 0; i < len(line); i++ {
 		if s.multilineQuote != "" {
-			if strings.HasPrefix(line[i:], s.multilineQuote) && !escaped {
+			if strings.HasPrefix(line[i:], s.multilineQuote) &&
+				!isEscapedDelimiter(line, i, s.multilineQuote) {
 				i += len(s.multilineQuote) - 1
 				s.multilineQuote = ""
 			}
-			escaped = false
 			continue
 		}
 
@@ -257,6 +255,17 @@ func (s *tableParseState) consumeLine(line string) {
 			s.bracketDepth--
 		}
 	}
+}
+
+func isEscapedDelimiter(line string, index int, delimiter string) bool {
+	if delimiter != `"""` {
+		return false
+	}
+	backslashes := 0
+	for i := index - 1; i >= 0 && line[i] == '\\'; i-- {
+		backslashes++
+	}
+	return backslashes%2 == 1
 }
 
 func appendSection(b *strings.Builder, text string) {

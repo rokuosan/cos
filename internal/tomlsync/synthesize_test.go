@@ -153,6 +153,37 @@ extra = "keep"
 	}
 }
 
+func TestSynthesizeDoesNotEndTripleQuotedBasicStringOnEscapedDelimiter(t *testing.T) {
+	source := parseDoc(t, `[foo]
+message = """
+keep \""" inside
+still here
+"""
+enabled = true
+`)
+	target := parseDoc(t, `[foo]
+message = """
+old
+"""
+extra = "keep"
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `[foo]
+message = """
+keep \""" inside
+still here
+"""
+
+enabled = true
+
+extra = "keep"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestSynthesizePreservesProjectsFromTarget(t *testing.T) {
 	source := parseDoc(t, `model = "gpt-5.5"
 
