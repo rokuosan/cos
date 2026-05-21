@@ -24,16 +24,16 @@ func TestDefaultCodexConfigPathFallsBackToHomeConfig(t *testing.T) {
 	}
 }
 
-func TestRunCodexConfigSyncRequiresSource(t *testing.T) {
+func TestRunSyncRequiresSource(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runCodexConfigSync(nil, &stdout, &stderr)
+	err := runSync(nil, &stdout, &stderr)
 	if err == nil || err.Error() != "--source is required" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestRunCodexConfigSyncSynthesizesToStdout(t *testing.T) {
+func TestRunSyncSynthesizesToStdout(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.toml")
 	target := filepath.Join(dir, "target.toml")
@@ -52,7 +52,7 @@ trust_level = "trusted"
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source, "--target", target}, &stdout, &stderr)
+	err := runSync([]string{"--source", source, "--target", target}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ trust_level = "trusted"
 	}
 }
 
-func TestRunCodexConfigSyncAllowsMissingTarget(t *testing.T) {
+func TestRunSyncAllowsMissingTarget(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.toml")
 	target := filepath.Join(dir, "missing.toml")
@@ -84,7 +84,7 @@ apps = true
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source, "--target", target}, &stdout, &stderr)
+	err := runSync([]string{"--source", source, "--target", target}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ apps = true
 	}
 }
 
-func TestRunCodexConfigSyncWriteUpdatesTarget(t *testing.T) {
+func TestRunSyncWriteUpdatesTarget(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.toml")
 	target := filepath.Join(dir, "target.toml")
@@ -118,7 +118,7 @@ trust_level = "trusted"
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runCodexConfigSync(
+	err := runSync(
 		[]string{"--source", source, "--target", target, "--write"},
 		&stdout,
 		&stderr,
@@ -167,7 +167,7 @@ trust_level = "trusted"
 	}
 }
 
-func TestRunCodexConfigSyncUsesCODEXHOMEByDefault(t *testing.T) {
+func TestRunSyncUsesCODEXHOMEByDefault(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
 	source := filepath.Join(dir, "source.toml")
@@ -187,7 +187,7 @@ trust_level = "trusted"
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source}, &stdout, &stderr)
+	err := runSync([]string{"--source", source}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}

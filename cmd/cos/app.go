@@ -10,6 +10,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return usage(stderr)
 	}
 	switch args[0] {
+	case "sync":
+		return runSync(args[1:], stdout, stderr)
 	case "codex-config":
 		return runCodexConfig(args[1:], stdout, stderr)
 	case "-h", "--help", "help":
@@ -20,6 +22,6 @@ func run(args []string, stdout, stderr io.Writer) error {
 }
 
 func usage(stderr io.Writer) error {
-	_, _ = fmt.Fprintln(stderr, "usage: cos codex-config <read|sync> ...")
+	_, _ = fmt.Fprintln(stderr, "usage: cos <sync|codex-config read> ...")
 	return nil
 }
