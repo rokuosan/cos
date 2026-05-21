@@ -85,3 +85,46 @@ apps = true
 		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, out.String())
 	}
 }
+
+func TestRunCodexConfigSyncWriteUpdatesTarget(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.toml")
+	target := filepath.Join(dir, "target.toml")
+	if err := os.WriteFile(source, []byte(`model = "gpt-5.5"
+
+[features]
+apps = true
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte(`[projects."/repo"]
+trust_level = "trusted"
+`), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	err := runCodexConfigSync([]string{"--source", source, "--target", target, "--write"}, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("unexpected stdout: %q", out.String())
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `model = "gpt-5.5"
+
+[features]
+apps = true
+
+[projects."/repo"]
+trust_level = "trusted"
+`
+	if string(got) != want {
+		t.Fatalf("unexpected target contents\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
