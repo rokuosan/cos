@@ -61,7 +61,12 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	blocks := make([]Block, 0, len(source.Blocks)+len(target.Blocks))
 	emittedRoot := map[string]struct{}{}
 	emittedTable := map[string]int{}
+	appendedExtraRoot := false
 	for _, block := range source.Blocks {
+		if len(block.Path) > 0 && !appendedExtraRoot {
+			blocks = append(blocks, targetOnlyRootBlocks(targetIndex.rootOrder, seenRoot)...)
+			appendedExtraRoot = true
+		}
 		switch {
 		case block.RootKV:
 			if _, ok := emittedRoot[block.Key]; ok {
@@ -83,11 +88,8 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 		}
 	}
 
-	for _, block := range targetIndex.rootOrder {
-		if _, ok := seenRoot[block.Key]; ok {
-			continue
-		}
-		blocks = append(blocks, block)
+	if !appendedExtraRoot {
+		blocks = append(blocks, targetOnlyRootBlocks(targetIndex.rootOrder, seenRoot)...)
 	}
 
 	appendedTables := map[string]int{}
@@ -107,6 +109,17 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 		blocks = append(blocks, block)
 	}
 	return Document{Blocks: blocks}
+}
+
+func targetOnlyRootBlocks(rootOrder []Block, seenRoot map[string]struct{}) []Block {
+	var blocks []Block
+	for _, block := range rootOrder {
+		if _, ok := seenRoot[block.Key]; ok {
+			continue
+		}
+		blocks = append(blocks, block)
+	}
+	return blocks
 }
 
 type documentIndex struct {

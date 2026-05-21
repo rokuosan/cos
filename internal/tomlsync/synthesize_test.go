@@ -124,6 +124,29 @@ b = "B"
 	}
 }
 
+func TestSynthesizeInsertsTargetOnlyRootKeysBeforeFirstTable(t *testing.T) {
+	source := parseDoc(t, `model = "gpt-5.5"
+
+[features]
+apps = true
+`)
+	target := parseDoc(t, `model = "old"
+approval_policy = "never"
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `model = "gpt-5.5"
+
+approval_policy = "never"
+
+[features]
+apps = true
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestSynthesizeMergesArrayTableInstancesByOccurrence(t *testing.T) {
 	source := parseDoc(t, `[[plugins.instances]]
 name = "github"
