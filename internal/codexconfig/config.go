@@ -18,15 +18,24 @@ type Project struct {
 	TrustLevel string
 }
 
-// Load reads and parses a Codex config file from path.
+// LoadDocument reads and parses a TOML config document from path.
 //
 // A leading "~/" is expanded to the current user's home directory.
-func Load(path string) (Config, error) {
+func LoadDocument(path string) (Document, error) {
 	data, err := os.ReadFile(expandHome(path))
 	if err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		return Document{}, fmt.Errorf("read config: %w", err)
 	}
 	doc, err := ParseDocument(strings.NewReader(string(data)))
+	if err != nil {
+		return Document{}, err
+	}
+	return doc, nil
+}
+
+// Load reads and parses a Codex config file from path.
+func Load(path string) (Config, error) {
+	doc, err := LoadDocument(path)
 	if err != nil {
 		return Config{}, err
 	}
