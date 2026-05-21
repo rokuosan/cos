@@ -33,6 +33,22 @@ func TestRunSyncRequiresSource(t *testing.T) {
 	}
 }
 
+func TestRunSyncRequiresTargetWithoutCodexMode(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.toml")
+	if err := os.WriteFile(source, []byte(`model = "gpt-5.5"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runSync([]string{"--source", source}, &stdout, &stderr)
+	if err == nil || err.Error() != "--target is required unless --codex is set" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRunSyncSynthesizesToStdout(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.toml")
@@ -167,7 +183,7 @@ trust_level = "trusted"
 	}
 }
 
-func TestRunSyncUsesCODEXHOMEByDefault(t *testing.T) {
+func TestRunSyncUsesCODEXHOMEInCodexMode(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
 	source := filepath.Join(dir, "source.toml")
@@ -187,7 +203,7 @@ trust_level = "trusted"
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := runSync([]string{"--source", source}, &stdout, &stderr)
+	err := runSync([]string{"--source", source, "--codex"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,6 +212,40 @@ trust_level = "trusted"
 
 [features]
 apps = true
+
+[projects."/repo"]
+trust_level = "trusted"
+`
+	if stdout.String() != want {
+		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, stdout.String())
+	}
+}
+
+func TestRunSyncCodexModeUsesProjectsPreserveByDefault(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.toml")
+	target := filepath.Join(dir, "target.toml")
+	if err := os.WriteFile(source, []byte(`model = "gpt-5.5"
+
+[projects."/source-only"]
+trust_level = "untrusted"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte(`[projects."/repo"]
+trust_level = "trusted"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runSync([]string{"--source", source, "--target", target, "--codex"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := `model = "gpt-5.5"
 
 [projects."/repo"]
 trust_level = "trusted"
