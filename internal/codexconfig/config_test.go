@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/rokuosan/cos/internal/tomlsync"
 )
 
 func TestProjectsReturnsCodexProjectEntries(t *testing.T) {
@@ -67,4 +69,13 @@ trust_level = "trusted"
 	if len(projects) != 1 || projects[0].Path != "/repo" || projects[0].TrustLevel != "trusted" {
 		t.Fatalf("unexpected projects: %#v", projects)
 	}
+}
+
+func parseDoc(t *testing.T, input string) tomlsync.Document {
+	t.Helper()
+	doc, err := tomlsync.ParseDocument(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return doc
 }

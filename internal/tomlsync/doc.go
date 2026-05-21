@@ -1,5 +1,5 @@
-// Package codexconfig provides lightweight parsing and synthesis helpers for
-// Codex config files.
+// Package tomlsync provides lightweight TOML document parsing, synthesis, and
+// writing helpers for config sync workflows.
 //
 // The parser intentionally supports only the shape needed by this repository:
 // root key/value blocks, table headers, literal and basic quoted table keys,
@@ -13,4 +13,4 @@
 // multiline string forms or broad TOML validation. If future sync features need
 // edits inside arbitrary values, the implementation should be replaced with a
 // TOML library rather than extended indefinitely.
-package codexconfig
+package tomlsync

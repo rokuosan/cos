@@ -1,4 +1,4 @@
-package codexconfig
+package tomlsync
 
 import (
 	"fmt"

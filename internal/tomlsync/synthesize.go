@@ -1,4 +1,4 @@
-package codexconfig
+package tomlsync
 
 import "strings"
 
@@ -45,21 +45,6 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	blocks = append(blocks, sourceBlocks[insertAt:]...)
 	blocks = append(blocks, preservedTables...)
 	return Document{Blocks: blocks}
-}
-
-// String renders the document by concatenating its original text blocks.
-func (d Document) String() string {
-	var b strings.Builder
-	for i, block := range d.Blocks {
-		if i > 0 && block.Text != "" && b.Len() > 0 && !strings.HasSuffix(b.String(), "\n\n") {
-			if !strings.HasSuffix(b.String(), "\n") {
-				b.WriteByte('\n')
-			}
-			b.WriteByte('\n')
-		}
-		b.WriteString(block.Text)
-	}
-	return b.String()
 }
 
 func (b Block) matchesAny(rules []PreserveRule) bool {

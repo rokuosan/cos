@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/rokuosan/cos/internal/codexconfig"
+	"github.com/rokuosan/cos/internal/tomlsync"
 )
 
 func runCodexConfig(args []string, stdout, stderr io.Writer) error {
@@ -65,37 +66,37 @@ func runSync(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("--source is required")
 	}
 	if len(preserve) == 0 {
-		preserve = []codexconfig.PreserveRule{"projects.*"}
+		preserve = []tomlsync.PreserveRule{"projects.*"}
 	}
 
-	sourceDoc, err := codexconfig.LoadDocument(*source)
+	sourceDoc, err := tomlsync.LoadDocument(*source)
 	if err != nil {
 		return err
 	}
-	targetDoc, err := codexconfig.LoadDocument(*target)
+	targetDoc, err := tomlsync.LoadDocument(*target)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		targetDoc = codexconfig.Document{}
+		targetDoc = tomlsync.Document{}
 	}
 
-	doc := codexconfig.Synthesize(sourceDoc, targetDoc, preserve)
+	doc := tomlsync.Synthesize(sourceDoc, targetDoc, preserve)
 	if *write {
-		return codexconfig.WriteDocument(*target, doc, *replaceSymlink)
+		return tomlsync.WriteDocument(*target, doc, *replaceSymlink)
 	}
 	_, err = io.WriteString(stdout, doc.String())
 	return err
 }
 
-type preserveRulesFlag []codexconfig.PreserveRule
+type preserveRulesFlag []tomlsync.PreserveRule
 
 func (f *preserveRulesFlag) String() string {
 	return ""
 }
 
 func (f *preserveRulesFlag) Set(value string) error {
-	*f = append(*f, codexconfig.PreserveRule(value))
+	*f = append(*f, tomlsync.PreserveRule(value))
 	return nil
 }
 
