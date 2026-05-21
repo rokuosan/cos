@@ -38,6 +38,27 @@ model = "new"
 	}
 }
 
+func TestQuotedRootKeyIsParsedAsRootBlock(t *testing.T) {
+	doc := parseDoc(t, `"my key" = "value"
+model = "new"
+`)
+	if len(doc.Blocks) != 2 {
+		t.Fatalf("expected two blocks, got %d", len(doc.Blocks))
+	}
+	if !doc.Blocks[0].RootKV || doc.Blocks[0].Key != `"my key"` {
+		t.Fatalf("unexpected quoted root block: %#v", doc.Blocks[0])
+	}
+}
+
+func TestUnterminatedQuotedTablePathReturnsError(t *testing.T) {
+	_, err := ParseDocument(strings.NewReader(`[projects."/repo]
+trust_level = "trusted"
+`))
+	if err == nil {
+		t.Fatal("expected parse error")
+	}
+}
+
 func TestBracketedValueLineIsNotTableHeader(t *testing.T) {
 	doc := parseDoc(t, `[projects."/repo"]
 tags = [

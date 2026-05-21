@@ -77,6 +77,9 @@ func ParseDocument(r io.Reader) (Document, error) {
 			current = &Block{Path: path, Text: line}
 			continue
 		}
+		if multilineDepth == 0 && current == nil && strings.HasPrefix(trimmed, "[") {
+			return Document{}, fmt.Errorf("invalid TOML table header: %s", trimmed)
+		}
 
 		if multilineDepth == 0 {
 			if key, ok := parseRootKey(trimmed); ok && (current == nil || current.RootKV) {
@@ -267,6 +270,9 @@ func splitTOMLPath(path string) ([]string, error) {
 			b.WriteRune(r)
 		}
 	}
+	if quote != 0 || escaped {
+		return nil, fmt.Errorf("invalid TOML path: %s", path)
+	}
 
 	part := strings.TrimSpace(b.String())
 	if part == "" {
@@ -280,15 +286,40 @@ func parseRootKey(trimmed string) (string, bool) {
 	if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "[") {
 		return "", false
 	}
-	key, _, ok := strings.Cut(trimmed, "=")
+	key, ok := rootKeyPrefix(trimmed)
 	if !ok {
 		return "", false
 	}
 	key = strings.TrimSpace(key)
-	if key == "" || strings.ContainsAny(key, " \t") {
+	if key == "" {
 		return "", false
 	}
 	return key, true
+}
+
+func rootKeyPrefix(line string) (string, bool) {
+	quote := rune(0)
+	escaped := false
+
+	for i, r := range line {
+		switch {
+		case escaped:
+			escaped = false
+		case r == '\\' && quote == '"':
+			escaped = true
+		case r == '"' && quote == 0:
+			quote = r
+		case r == '"' && quote == r:
+			quote = 0
+		case r == '\'' && quote == 0:
+			quote = r
+		case r == '\'' && quote == r:
+			quote = 0
+		case r == '=' && quote == 0:
+			return line[:i], true
+		}
+	}
+	return "", false
 }
 
 func expandHome(path string) string {
