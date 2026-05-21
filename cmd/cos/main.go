@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -94,7 +95,10 @@ func runCodexConfigSync(args []string, out io.Writer) error {
 	}
 	targetDoc, err := codexconfig.LoadDocument(*target)
 	if err != nil {
-		return err
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		targetDoc = codexconfig.Document{}
 	}
 
 	_, err = io.WriteString(out, codexconfig.Synthesize(sourceDoc, targetDoc, preserve).String())
