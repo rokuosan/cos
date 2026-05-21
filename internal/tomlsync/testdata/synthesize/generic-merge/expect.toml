@@ -1,0 +1,22 @@
+a = "A"
+
+b = "B"
+
+c = "C"
+
+d = "D"
+
+[foo]
+left = "source"
+
+right = "keep"
+
+[foo.bar]
+message = """
+left = right
+"""
+
+extra = "keep"
+
+[foo.baz]
+leaf = "target-only"

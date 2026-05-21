@@ -1,0 +1,7 @@
+model = "old"
+
+[projects."/Users/example/repo"]
+trust_level = "trusted"
+
+[projects."/Users/example/other"]
+trust_level = "untrusted"
