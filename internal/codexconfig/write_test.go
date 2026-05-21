@@ -25,6 +25,26 @@ func TestWriteDocumentCreatesNewFile(t *testing.T) {
 	}
 }
 
+func TestWriteDocumentCreatesDirectoryWithPrivatePermissions(t *testing.T) {
+	dir := t.TempDir()
+	targetDir := filepath.Join(dir, "nested")
+	path := filepath.Join(targetDir, "config.toml")
+	doc := parseDoc(t, `model = "gpt-5.5"
+`)
+
+	if err := WriteDocument(path, doc, false); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(targetDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o700 {
+		t.Fatalf("unexpected directory mode: got %o", info.Mode().Perm())
+	}
+}
+
 func TestWriteDocumentPreservesPermissions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
