@@ -3,6 +3,7 @@ package codexconfig
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -50,22 +51,20 @@ trust_level = "trusted"
 	}
 }
 
-func TestLoadDocumentReadsConfigFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.toml")
-	if err := os.WriteFile(path, []byte(`model = "gpt-5.5"
+func TestParseConfigParsesConfig(t *testing.T) {
+	cfg, err := ParseConfig(strings.NewReader(`model = "gpt-5.5"
 
 [projects."/repo"]
 trust_level = "trusted"
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	doc, err := LoadDocument(path)
+`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(doc.Blocks) != 2 {
-		t.Fatalf("unexpected blocks: %#v", doc.Blocks)
+	if len(cfg.Document.Blocks) != 2 {
+		t.Fatalf("unexpected blocks: %#v", cfg.Document.Blocks)
+	}
+	projects := cfg.Projects()
+	if len(projects) != 1 || projects[0].Path != "/repo" || projects[0].TrustLevel != "trusted" {
+		t.Fatalf("unexpected projects: %#v", projects)
 	}
 }
