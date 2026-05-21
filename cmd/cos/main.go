@@ -76,6 +76,12 @@ func runCodexConfigSync(args []string, out io.Writer) error {
 
 	source := fs.String("source", "", "master Codex config path")
 	target := fs.String("target", "~/.codex/config.toml", "current Codex config path")
+	write := fs.Bool("write", false, "write synthesized config to target")
+	replaceSymlink := fs.Bool(
+		"replace-symlink",
+		false,
+		"replace a symlink target with a regular file",
+	)
 	var preserve preserveRulesFlag
 	fs.Var(&preserve, "preserve", "target-owned dotted TOML path to preserve; may be repeated")
 
@@ -101,7 +107,11 @@ func runCodexConfigSync(args []string, out io.Writer) error {
 		targetDoc = codexconfig.Document{}
 	}
 
-	_, err = io.WriteString(out, codexconfig.Synthesize(sourceDoc, targetDoc, preserve).String())
+	doc := codexconfig.Synthesize(sourceDoc, targetDoc, preserve)
+	if *write {
+		return codexconfig.WriteDocument(*target, doc, *replaceSymlink)
+	}
+	_, err = io.WriteString(out, doc.String())
 	return err
 }
 
