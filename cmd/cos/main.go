@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/rokuosan/cos/internal/codexconfig"
 )
@@ -53,7 +54,7 @@ func runCodexConfig(args []string) error {
 func runCodexConfigRead(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("codex-config read", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	path := fs.String("path", "~/.codex/config.toml", "Codex config path")
+	path := fs.String("path", defaultCodexConfigPath(), "Codex config path")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func runCodexConfigSync(args []string, out io.Writer) error {
 	fs.SetOutput(os.Stderr)
 
 	source := fs.String("source", "", "master Codex config path")
-	target := fs.String("target", "~/.codex/config.toml", "current Codex config path")
+	target := fs.String("target", defaultCodexConfigPath(), "current Codex config path")
 	write := fs.Bool("write", false, "write synthesized config to target")
 	replaceSymlink := fs.Bool(
 		"replace-symlink",
@@ -124,4 +125,11 @@ func (f *preserveRulesFlag) String() string {
 func (f *preserveRulesFlag) Set(value string) error {
 	*f = append(*f, codexconfig.PreserveRule(value))
 	return nil
+}
+
+func defaultCodexConfigPath() string {
+	if codexHome := os.Getenv("CODEX_HOME"); codexHome != "" {
+		return filepath.Join(codexHome, "config.toml")
+	}
+	return "~/.codex/config.toml"
 }
