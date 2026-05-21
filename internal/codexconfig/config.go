@@ -2,6 +2,7 @@ package codexconfig
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,19 +19,33 @@ type Project struct {
 	TrustLevel string
 }
 
-// Load reads and parses a Codex config file from path.
+// LoadDocument reads and parses a TOML config document from path.
 //
 // A leading "~/" is expanded to the current user's home directory.
+func LoadDocument(path string) (Document, error) {
+	data, err := os.ReadFile(expandHome(path))
+	if err != nil {
+		return Document{}, fmt.Errorf("read config: %w", err)
+	}
+	return ParseDocument(strings.NewReader(string(data)))
+}
+
+// ParseConfig reads and parses a Codex config file from r.
+func ParseConfig(r io.Reader) (Config, error) {
+	doc, err := ParseDocument(r)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{Document: doc}, nil
+}
+
+// Load reads and parses a Codex config file from path.
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(expandHome(path))
 	if err != nil {
 		return Config{}, fmt.Errorf("read config: %w", err)
 	}
-	doc, err := ParseDocument(strings.NewReader(string(data)))
-	if err != nil {
-		return Config{}, err
-	}
-	return Config{Document: doc}, nil
+	return ParseConfig(strings.NewReader(string(data)))
 }
 
 // Projects returns project trust entries from the config file.

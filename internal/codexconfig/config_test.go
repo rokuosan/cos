@@ -3,6 +3,7 @@ package codexconfig
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +47,24 @@ trust_level = "trusted"
 	}
 	projects := cfg.Projects()
 	if len(projects) != 1 || projects[0].Path != "/repo" {
+		t.Fatalf("unexpected projects: %#v", projects)
+	}
+}
+
+func TestParseConfigParsesConfig(t *testing.T) {
+	cfg, err := ParseConfig(strings.NewReader(`model = "gpt-5.5"
+
+[projects."/repo"]
+trust_level = "trusted"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Document.Blocks) != 2 {
+		t.Fatalf("unexpected blocks: %#v", cfg.Document.Blocks)
+	}
+	projects := cfg.Projects()
+	if len(projects) != 1 || projects[0].Path != "/repo" || projects[0].TrustLevel != "trusted" {
 		t.Fatalf("unexpected projects: %#v", projects)
 	}
 }
