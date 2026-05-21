@@ -5,6 +5,94 @@ import (
 	"testing"
 )
 
+func TestSynthesizeUsesSourceForOverlappingRootKeysAndPreservesTargetOnlyKeys(t *testing.T) {
+	source := parseDoc(t, `a = "A"
+b = "B"
+c = "C"
+`)
+	target := parseDoc(t, `a = "AA"
+b = "BBB"
+c = "C"
+d = "D"
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `a = "A"
+
+b = "B"
+
+c = "C"
+
+d = "D"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestSynthesizeMergesTableEntriesRecursively(t *testing.T) {
+	source := parseDoc(t, `[foo]
+a = "A"
+
+[foo.bar]
+c = "C"
+`)
+	target := parseDoc(t, `[foo]
+a = "AA"
+b = "B"
+
+[foo.bar]
+c = "old"
+d = "D"
+
+[foo.baz]
+e = "E"
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `[foo]
+a = "A"
+
+b = "B"
+
+[foo.bar]
+c = "C"
+
+d = "D"
+
+[foo.baz]
+e = "E"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestSynthesizePreservesCommentsOnTargetOnlyTableEntries(t *testing.T) {
+	source := parseDoc(t, `[foo]
+a = "A"
+`)
+	target := parseDoc(t, `[foo]
+# keep me
+b = [
+  "B",
+]
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `[foo]
+a = "A"
+
+# keep me
+b = [
+  "B",
+]
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestSynthesizePreservesProjectsFromTarget(t *testing.T) {
 	source := parseDoc(t, `model = "gpt-5.5"
 
