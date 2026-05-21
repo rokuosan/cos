@@ -62,7 +62,9 @@ func runCodexConfigRead(args []string, out io.Writer) error {
 		return err
 	}
 	for _, project := range cfg.Projects() {
-		fmt.Fprintf(out, "%s\t%s\n", project.Path, project.TrustLevel)
+		if _, err := fmt.Fprintf(out, "%s\t%s\n", project.Path, project.TrustLevel); err != nil {
+			return err
+		}
 	}
 	return nil
 }
