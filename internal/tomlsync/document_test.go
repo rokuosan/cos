@@ -45,7 +45,7 @@ model = "new"
 	if len(doc.Blocks) != 2 {
 		t.Fatalf("expected two blocks, got %d", len(doc.Blocks))
 	}
-	if !doc.Blocks[0].RootKV || doc.Blocks[0].Key != `"my key"` {
+	if !doc.Blocks[0].RootKV || doc.Blocks[0].Key != `my key` {
 		t.Fatalf("unexpected quoted root block: %#v", doc.Blocks[0])
 	}
 }

@@ -62,7 +62,7 @@ func (b Block) matches(rule PreserveRule) bool {
 		return false
 	}
 	if b.RootKV {
-		return len(rulePath) == 1 && rulePath[0] == b.Key
+		return len(rulePath) == 1 && normalizeRootKey(rulePath[0]) == b.Key
 	}
 	if len(b.Path) == 0 {
 		return false

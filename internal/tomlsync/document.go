@@ -290,7 +290,7 @@ func parseRootKey(trimmed string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	key = strings.TrimSpace(key)
+	key = normalizeRootKey(key)
 	if key == "" {
 		return "", false
 	}
@@ -320,6 +320,18 @@ func rootKeyPrefix(line string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func normalizeRootKey(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	parts, err := splitTOMLPath(key)
+	if err != nil || len(parts) != 1 {
+		return key
+	}
+	return parts[0]
 }
 
 func expandHome(path string) string {

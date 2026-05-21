@@ -52,6 +52,20 @@ approval_policy = "never"
 	}
 }
 
+func TestSynthesizePreservesQuotedRootKeyAcrossQuotingStyles(t *testing.T) {
+	source := parseDoc(t, `"approval policy" = "untrusted"
+`)
+	target := parseDoc(t, `approval policy = "never"
+`)
+
+	got := Synthesize(source, target, []PreserveRule{`"approval policy"`}).String()
+	want := `approval policy = "never"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestSynthesizeKeepsPreservedRootKeyBeforeTables(t *testing.T) {
 	source := parseDoc(t, `model = "gpt-5.5"
 approval_policy = "untrusted"
