@@ -1,0 +1,12 @@
+model = "gpt-5.5"
+
+approval_policy = "untrusted"
+
+[features]
+apps = true
+
+[projects."/Users/example/repo"]
+trust_level = "trusted"
+
+[projects."/Users/example/other"]
+trust_level = "untrusted"
