@@ -1,4 +1,4 @@
-package codexconfig
+package tomlsync
 
 import "strings"
 
@@ -47,21 +47,6 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	return Document{Blocks: blocks}
 }
 
-// String renders the document by concatenating its original text blocks.
-func (d Document) String() string {
-	var b strings.Builder
-	for i, block := range d.Blocks {
-		if i > 0 && block.Text != "" && b.Len() > 0 && !strings.HasSuffix(b.String(), "\n\n") {
-			if !strings.HasSuffix(b.String(), "\n") {
-				b.WriteByte('\n')
-			}
-			b.WriteByte('\n')
-		}
-		b.WriteString(block.Text)
-	}
-	return b.String()
-}
-
 func (b Block) matchesAny(rules []PreserveRule) bool {
 	for _, rule := range rules {
 		if b.matches(rule) {
@@ -77,7 +62,7 @@ func (b Block) matches(rule PreserveRule) bool {
 		return false
 	}
 	if b.RootKV {
-		return len(rulePath) == 1 && rulePath[0] == b.Key
+		return len(rulePath) == 1 && normalizeRootKey(rulePath[0]) == b.Key
 	}
 	if len(b.Path) == 0 {
 		return false

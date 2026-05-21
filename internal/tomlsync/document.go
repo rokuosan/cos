@@ -1,9 +1,11 @@
-package codexconfig
+package tomlsync
 
 import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,12 +25,19 @@ type Document struct {
 	Blocks []Block
 }
 
+// LoadDocument reads and parses a TOML config document from path.
+//
+// A leading "~/" is expanded to the current user's home directory.
+func LoadDocument(path string) (Document, error) {
+	data, err := os.ReadFile(expandHome(path))
+	if err != nil {
+		return Document{}, fmt.Errorf("read config: %w", err)
+	}
+	return ParseDocument(strings.NewReader(string(data)))
+}
+
 // ParseDocument reads TOML text and splits it into blocks without normalizing
 // formatting.
-//
-// This parser intentionally recognizes only the structure needed to inspect a
-// Codex config: root key/value entries and table headers. It does not validate
-// the full TOML grammar.
 func ParseDocument(r io.Reader) (Document, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
@@ -68,6 +77,9 @@ func ParseDocument(r io.Reader) (Document, error) {
 			current = &Block{Path: path, Text: line}
 			continue
 		}
+		if multilineDepth == 0 && current == nil && strings.HasPrefix(trimmed, "[") {
+			return Document{}, fmt.Errorf("invalid TOML table header: %s", trimmed)
+		}
 
 		if multilineDepth == 0 {
 			if key, ok := parseRootKey(trimmed); ok && (current == nil || current.RootKV) {
@@ -98,6 +110,21 @@ func ParseDocument(r io.Reader) (Document, error) {
 	flushCurrent()
 	flushPending()
 	return Document{Blocks: blocks}, nil
+}
+
+// String renders the document by concatenating its original text blocks.
+func (d Document) String() string {
+	var b strings.Builder
+	for i, block := range d.Blocks {
+		if i > 0 && block.Text != "" && b.Len() > 0 && !strings.HasSuffix(b.String(), "\n\n") {
+			if !strings.HasSuffix(b.String(), "\n") {
+				b.WriteByte('\n')
+			}
+			b.WriteByte('\n')
+		}
+		b.WriteString(block.Text)
+	}
+	return b.String()
 }
 
 func isTableHeader(trimmed string) bool {
@@ -243,9 +270,10 @@ func splitTOMLPath(path string) ([]string, error) {
 			b.WriteRune(r)
 		}
 	}
-	if quote != 0 {
-		return nil, fmt.Errorf("unterminated quote in TOML path: %s", path)
+	if quote != 0 || escaped {
+		return nil, fmt.Errorf("invalid TOML path: %s", path)
 	}
+
 	part := strings.TrimSpace(b.String())
 	if part == "" {
 		return nil, fmt.Errorf("invalid TOML path: %s", path)
@@ -258,24 +286,64 @@ func parseRootKey(trimmed string) (string, bool) {
 	if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "[") {
 		return "", false
 	}
+	key, ok := rootKeyPrefix(trimmed)
+	if !ok {
+		return "", false
+	}
+	key = normalizeRootKey(key)
+	if key == "" {
+		return "", false
+	}
+	return key, true
+}
 
-	inQuote := false
+func rootKeyPrefix(line string) (string, bool) {
+	quote := rune(0)
 	escaped := false
-	for i, r := range trimmed {
+
+	for i, r := range line {
 		switch {
 		case escaped:
 			escaped = false
-		case r == '\\' && inQuote:
+		case r == '\\' && quote == '"':
 			escaped = true
-		case r == '"':
-			inQuote = !inQuote
-		case r == '=' && !inQuote:
-			key := strings.TrimSpace(trimmed[:i])
-			if key == "" {
-				return "", false
-			}
-			return strings.Trim(key, `"`), true
+		case r == '"' && quote == 0:
+			quote = r
+		case r == '"' && quote == r:
+			quote = 0
+		case r == '\'' && quote == 0:
+			quote = r
+		case r == '\'' && quote == r:
+			quote = 0
+		case r == '=' && quote == 0:
+			return line[:i], true
 		}
 	}
 	return "", false
+}
+
+func normalizeRootKey(key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	parts, err := splitTOMLPath(key)
+	if err != nil || len(parts) != 1 {
+		return key
+	}
+	return parts[0]
+}
+
+func expandHome(path string) string {
+	if path == "~" {
+		if home, err := os.UserHomeDir(); err == nil {
+			return home
+		}
+	}
+	if after, ok := strings.CutPrefix(path, "~/"); ok {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, after)
+		}
+	}
+	return path
 }

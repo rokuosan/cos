@@ -1,16 +1,15 @@
 package codexconfig
 
 import (
-	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/rokuosan/cos/internal/tomlsync"
 )
 
 // Config is a parsed Codex config file.
 type Config struct {
-	Document Document
+	Document tomlsync.Document
 }
 
 // Project is a Codex project entry from the config file.
@@ -19,20 +18,9 @@ type Project struct {
 	TrustLevel string
 }
 
-// LoadDocument reads and parses a TOML config document from path.
-//
-// A leading "~/" is expanded to the current user's home directory.
-func LoadDocument(path string) (Document, error) {
-	data, err := os.ReadFile(expandHome(path))
-	if err != nil {
-		return Document{}, fmt.Errorf("read config: %w", err)
-	}
-	return ParseDocument(strings.NewReader(string(data)))
-}
-
 // ParseConfig reads and parses a Codex config file from r.
 func ParseConfig(r io.Reader) (Config, error) {
-	doc, err := ParseDocument(r)
+	doc, err := tomlsync.ParseDocument(r)
 	if err != nil {
 		return Config{}, err
 	}
@@ -41,11 +29,11 @@ func ParseConfig(r io.Reader) (Config, error) {
 
 // Load reads and parses a Codex config file from path.
 func Load(path string) (Config, error) {
-	data, err := os.ReadFile(expandHome(path))
+	doc, err := tomlsync.LoadDocument(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		return Config{}, err
 	}
-	return ParseConfig(strings.NewReader(string(data)))
+	return Config{Document: doc}, nil
 }
 
 // Projects returns project trust entries from the config file.
@@ -91,18 +79,4 @@ func stripInlineComment(line string) string {
 		}
 	}
 	return line
-}
-
-func expandHome(path string) string {
-	if path == "~" {
-		if home, err := os.UserHomeDir(); err == nil {
-			return home
-		}
-	}
-	if after, ok := strings.CutPrefix(path, "~/"); ok {
-		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, after)
-		}
-	}
-	return path
 }
