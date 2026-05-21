@@ -93,6 +93,37 @@ b = [
 	}
 }
 
+func TestSynthesizePreservesStandaloneSourceBlocks(t *testing.T) {
+	source := parseDoc(t, `# source header
+
+[foo]
+a = "A"
+
+# source footer
+`)
+	target := parseDoc(t, `[foo]
+a = "old"
+
+[bar]
+b = "B"
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `# source header
+
+[foo]
+a = "A"
+
+# source footer
+
+[bar]
+b = "B"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestSynthesizeMergesArrayTableInstancesByOccurrence(t *testing.T) {
 	source := parseDoc(t, `[[plugins.instances]]
 name = "github"
@@ -178,6 +209,25 @@ still here
 enabled = true
 
 extra = "keep"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestSynthesizePreservesTargetOnlyTableTrailer(t *testing.T) {
+	source := parseDoc(t, `[foo]
+a = "A"
+`)
+	target := parseDoc(t, `[foo]
+a = "old"
+# keep trailer
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `[foo]
+a = "A"
+# keep trailer
 `
 	if got != want {
 		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)

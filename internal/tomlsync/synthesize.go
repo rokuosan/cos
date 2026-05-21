@@ -13,10 +13,11 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	sourceIndex := indexDocument(source)
 	targetIndex := indexDocument(target)
 
-	var mergedRoot []Block
-	var mergedTables []Block
 	seenRoot := map[string]struct{}{}
+	sourceRootResults := map[string]Block{}
+	sourceTableResults := map[string][]Block{}
 	consumedTables := map[string]int{}
+	sourceTableCounts := map[string]int{}
 
 	for _, block := range sourceIndex.rootOrder {
 		key := block.Key
@@ -26,52 +27,85 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 		switch {
 		case block.matchesAny(preserve):
 			if hasTarget {
-				mergedRoot = append(mergedRoot, targetBlock)
+				sourceRootResults[key] = targetBlock
 			}
 		case hasTarget:
-			mergedRoot = append(mergedRoot, block)
+			sourceRootResults[key] = block
 		default:
-			mergedRoot = append(mergedRoot, block)
+			sourceRootResults[key] = block
 		}
-	}
-	for _, block := range targetIndex.rootOrder {
-		key := block.Key
-		if _, ok := seenRoot[key]; ok {
-			continue
-		}
-		mergedRoot = append(mergedRoot, block)
 	}
 
 	for _, block := range sourceIndex.tableOrder {
 		pathKey := blockPathKey(block.Path)
+		sourceTableCounts[pathKey]++
 		targetBlock, hasTarget := targetIndex.nextTable(pathKey)
 
 		switch {
 		case block.matchesAny(preserve):
 			if hasTarget {
-				mergedTables = append(mergedTables, targetBlock)
+				sourceTableResults[pathKey] = append(sourceTableResults[pathKey], targetBlock)
 				consumedTables[pathKey]++
 			}
 		case hasTarget:
-			mergedTables = append(mergedTables, mergeTableBlock(block, targetBlock))
+			sourceTableResults[pathKey] = append(
+				sourceTableResults[pathKey],
+				mergeTableBlock(block, targetBlock),
+			)
 			consumedTables[pathKey]++
 		default:
-			mergedTables = append(mergedTables, block)
+			sourceTableResults[pathKey] = append(sourceTableResults[pathKey], block)
 		}
 	}
+
+	blocks := make([]Block, 0, len(source.Blocks)+len(target.Blocks))
+	emittedRoot := map[string]struct{}{}
+	emittedTable := map[string]int{}
+	for _, block := range source.Blocks {
+		switch {
+		case block.RootKV:
+			if _, ok := emittedRoot[block.Key]; ok {
+				continue
+			}
+			emittedRoot[block.Key] = struct{}{}
+			if merged, ok := sourceRootResults[block.Key]; ok {
+				blocks = append(blocks, merged)
+			}
+		case len(block.Path) > 0:
+			pathKey := blockPathKey(block.Path)
+			index := emittedTable[pathKey]
+			emittedTable[pathKey] = index + 1
+			if index < len(sourceTableResults[pathKey]) {
+				blocks = append(blocks, sourceTableResults[pathKey][index])
+			}
+		default:
+			blocks = append(blocks, block)
+		}
+	}
+
+	for _, block := range targetIndex.rootOrder {
+		if _, ok := seenRoot[block.Key]; ok {
+			continue
+		}
+		blocks = append(blocks, block)
+	}
+
 	appendedTables := map[string]int{}
-	for _, block := range targetIndex.tableOrder {
+	for _, block := range target.Blocks {
+		if len(block.Path) == 0 {
+			continue
+		}
 		pathKey := blockPathKey(block.Path)
 		if appendedTables[pathKey] < consumedTables[pathKey] {
 			appendedTables[pathKey]++
 			continue
 		}
-		mergedTables = append(mergedTables, block)
+		if appendedTables[pathKey] < sourceTableCounts[pathKey] {
+			appendedTables[pathKey]++
+			continue
+		}
+		blocks = append(blocks, block)
 	}
-
-	blocks := make([]Block, 0, len(mergedRoot)+len(mergedTables))
-	blocks = append(blocks, mergedRoot...)
-	blocks = append(blocks, mergedTables...)
 	return Document{Blocks: blocks}
 }
 
@@ -122,7 +156,7 @@ func mergeTableBlock(source, target Block) Block {
 	_, targetBody := splitTableBlock(target.Text)
 
 	sourceEntries, sourceTrailer := parseTableEntries(sourceBody)
-	targetEntries, _ := parseTableEntries(targetBody)
+	targetEntries, targetTrailer := parseTableEntries(targetBody)
 
 	var body strings.Builder
 	seen := map[string]struct{}{}
@@ -136,7 +170,7 @@ func mergeTableBlock(source, target Block) Block {
 		}
 		appendSection(&body, entry.Text)
 	}
-	body.WriteString(sourceTrailer)
+	body.WriteString(mergeTableTrailer(sourceTrailer, targetTrailer))
 
 	return Block{
 		Path: source.Path,
@@ -177,6 +211,12 @@ func parseTableEntries(body string) ([]tableEntry, string) {
 			continue
 		}
 		trimmed := strings.TrimSpace(line)
+		if current != nil && state.canStartEntry() && isCommentOrBlankLine(trimmed) {
+			flushCurrent()
+			pending = append(pending, line)
+			state.consumeLine(line)
+			continue
+		}
 		if state.canStartEntry() {
 			if key, ok := parseRootKey(trimmed); ok {
 				flushCurrent()
@@ -199,6 +239,10 @@ func parseTableEntries(body string) ([]tableEntry, string) {
 	}
 	flushCurrent()
 	return entries, strings.Join(pending, "")
+}
+
+func isCommentOrBlankLine(trimmed string) bool {
+	return trimmed == "" || strings.HasPrefix(trimmed, "#")
 }
 
 type tableParseState struct {
@@ -279,6 +323,16 @@ func appendSection(b *strings.Builder, text string) {
 		b.WriteByte('\n')
 	}
 	b.WriteString(text)
+}
+
+func mergeTableTrailer(sourceTrailer, targetTrailer string) string {
+	if strings.TrimSpace(targetTrailer) == "" {
+		return sourceTrailer
+	}
+	if strings.TrimSpace(sourceTrailer) != "" {
+		return sourceTrailer
+	}
+	return sourceTrailer + targetTrailer
 }
 
 func (b Block) matchesAny(rules []PreserveRule) bool {
