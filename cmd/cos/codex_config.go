@@ -18,8 +18,6 @@ func runCodexConfig(args []string, stdout, stderr io.Writer) error {
 	switch args[0] {
 	case "read":
 		return runCodexConfigRead(args[1:], stdout, stderr)
-	case "sync":
-		return runCodexConfigSync(args[1:], stdout, stderr)
 	default:
 		return fmt.Errorf("unknown codex-config command %q", args[0])
 	}
@@ -45,8 +43,8 @@ func runCodexConfigRead(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-func runCodexConfigSync(args []string, stdout, stderr io.Writer) error {
-	fs := flag.NewFlagSet("codex-config sync", flag.ContinueOnError)
+func runSync(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
 	source := fs.String("source", "", "master Codex config path")
