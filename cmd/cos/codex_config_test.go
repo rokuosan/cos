@@ -7,13 +7,6 @@ import (
 	"testing"
 )
 
-func TestRunRejectsUnknownCommand(t *testing.T) {
-	err := run([]string{"unknown"})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
 func TestDefaultCodexConfigPathUsesCODEXHOME(t *testing.T) {
 	t.Setenv("CODEX_HOME", "/tmp/codex-home")
 	got := defaultCodexConfigPath()
@@ -32,8 +25,9 @@ func TestDefaultCodexConfigPathFallsBackToHomeConfig(t *testing.T) {
 }
 
 func TestRunCodexConfigSyncRequiresSource(t *testing.T) {
-	var out bytes.Buffer
-	err := runCodexConfigSync(nil, &out)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runCodexConfigSync(nil, &stdout, &stderr)
 	if err == nil || err.Error() != "--source is required" {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -56,8 +50,9 @@ trust_level = "trusted"
 		t.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source, "--target", target}, &out)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runCodexConfigSync([]string{"--source", source, "--target", target}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,8 +65,8 @@ apps = true
 [projects."/repo"]
 trust_level = "trusted"
 `
-	if out.String() != want {
-		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, out.String())
+	if stdout.String() != want {
+		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
 }
 
@@ -87,8 +82,9 @@ apps = true
 		t.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source, "--target", target}, &out)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runCodexConfigSync([]string{"--source", source, "--target", target}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,8 +94,8 @@ apps = true
 [features]
 apps = true
 `
-	if out.String() != want {
-		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, out.String())
+	if stdout.String() != want {
+		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
 }
 
@@ -120,13 +116,18 @@ trust_level = "trusted"
 		t.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source, "--target", target, "--write"}, &out)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runCodexConfigSync(
+		[]string{"--source", source, "--target", target, "--write"},
+		&stdout,
+		&stderr,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Len() != 0 {
-		t.Fatalf("unexpected stdout: %q", out.String())
+	if stdout.Len() != 0 {
+		t.Fatalf("unexpected stdout: %q", stdout.String())
 	}
 
 	got, err := os.ReadFile(target)
@@ -156,12 +157,13 @@ trust_level = "trusted"
 		t.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	if err := runCodexConfigRead(nil, &out); err != nil {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := runCodexConfigRead(nil, &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
-	if out.String() != "/repo\ttrusted\n" {
-		t.Fatalf("unexpected output: %q", out.String())
+	if stdout.String() != "/repo\ttrusted\n" {
+		t.Fatalf("unexpected output: %q", stdout.String())
 	}
 }
 
@@ -183,8 +185,9 @@ trust_level = "trusted"
 		t.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	err := runCodexConfigSync([]string{"--source", source}, &out)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runCodexConfigSync([]string{"--source", source}, &stdout, &stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +200,7 @@ apps = true
 [projects."/repo"]
 trust_level = "trusted"
 `
-	if out.String() != want {
-		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, out.String())
+	if stdout.String() != want {
+		t.Fatalf("unexpected output\nwant:\n%s\ngot:\n%s", want, stdout.String())
 	}
 }
