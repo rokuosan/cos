@@ -23,5 +23,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 
 func usage(stderr io.Writer) error {
 	_, _ = fmt.Fprintln(stderr, "usage: cos <sync|codex-config read> ...")
+	_, _ = fmt.Fprintln(stderr)
+	_, _ = fmt.Fprintln(stderr, "sync syncs a TOML config from source to target.")
 	return nil
 }

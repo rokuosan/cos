@@ -48,8 +48,9 @@ func runSync(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
-	source := fs.String("source", "", "master Codex config path")
-	target := fs.String("target", defaultCodexConfigPath(), "current Codex config path")
+	source := fs.String("source", "", "source TOML config path")
+	target := fs.String("target", "", "target TOML config path")
+	codexMode := fs.Bool("codex", false, "apply Codex-specific sync defaults")
 	write := fs.Bool("write", false, "write synthesized config to target")
 	replaceSymlink := fs.Bool(
 		"replace-symlink",
@@ -65,7 +66,13 @@ func runSync(args []string, stdout, stderr io.Writer) error {
 	if *source == "" {
 		return fmt.Errorf("--source is required")
 	}
-	if len(preserve) == 0 {
+	if *target == "" {
+		if !*codexMode {
+			return fmt.Errorf("--target is required unless --codex is set")
+		}
+		*target = defaultCodexConfigPath()
+	}
+	if len(preserve) == 0 && *codexMode {
 		preserve = []tomlsync.PreserveRule{"projects.*"}
 	}
 

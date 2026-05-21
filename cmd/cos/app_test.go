@@ -42,7 +42,7 @@ func TestUsageShowsTopLevelSync(t *testing.T) {
 	if err := usage(&stderr); err != nil {
 		t.Fatal(err)
 	}
-	if got := stderr.String(); got != "usage: cos <sync|codex-config read> ...\n" {
+	if got := stderr.String(); got != "usage: cos <sync|codex-config read> ...\n\nsync syncs a TOML config from source to target.\n" {
 		t.Fatalf("unexpected usage: %q", got)
 	}
 }
