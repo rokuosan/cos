@@ -17,6 +17,7 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	var mergedTables []Block
 	seenRoot := map[string]struct{}{}
 	seenTables := map[string]struct{}{}
+	consumedTables := map[string]int{}
 
 	for _, block := range sourceIndex.rootOrder {
 		key := block.Key
@@ -45,22 +46,26 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	for _, block := range sourceIndex.tableOrder {
 		pathKey := blockPathKey(block.Path)
 		seenTables[pathKey] = struct{}{}
-		targetBlock, hasTarget := targetIndex.tableByPath[pathKey]
+		targetBlock, hasTarget := targetIndex.nextTable(pathKey)
 
 		switch {
 		case block.matchesAny(preserve):
 			if hasTarget {
 				mergedTables = append(mergedTables, targetBlock)
+				consumedTables[pathKey]++
 			}
 		case hasTarget:
 			mergedTables = append(mergedTables, mergeTableBlock(block, targetBlock))
+			consumedTables[pathKey]++
 		default:
 			mergedTables = append(mergedTables, block)
 		}
 	}
+	appendedTables := map[string]int{}
 	for _, block := range targetIndex.tableOrder {
 		pathKey := blockPathKey(block.Path)
-		if _, ok := seenTables[pathKey]; ok {
+		if appendedTables[pathKey] < consumedTables[pathKey] {
+			appendedTables[pathKey]++
 			continue
 		}
 		mergedTables = append(mergedTables, block)
@@ -73,16 +78,18 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 }
 
 type documentIndex struct {
-	rootOrder   []Block
-	rootByKey   map[string]Block
-	tableOrder  []Block
-	tableByPath map[string]Block
+	rootOrder    []Block
+	rootByKey    map[string]Block
+	tableOrder   []Block
+	tableByPath  map[string][]Block
+	tableIndices map[string]int
 }
 
 func indexDocument(doc Document) documentIndex {
 	out := documentIndex{
-		rootByKey:   map[string]Block{},
-		tableByPath: map[string]Block{},
+		rootByKey:    map[string]Block{},
+		tableByPath:  map[string][]Block{},
+		tableIndices: map[string]int{},
 	}
 	for _, block := range doc.Blocks {
 		switch {
@@ -91,10 +98,21 @@ func indexDocument(doc Document) documentIndex {
 			out.rootByKey[block.Key] = block
 		case len(block.Path) > 0:
 			out.tableOrder = append(out.tableOrder, block)
-			out.tableByPath[blockPathKey(block.Path)] = block
+			key := blockPathKey(block.Path)
+			out.tableByPath[key] = append(out.tableByPath[key], block)
 		}
 	}
 	return out
+}
+
+func (i *documentIndex) nextTable(pathKey string) (Block, bool) {
+	blocks := i.tableByPath[pathKey]
+	index := i.tableIndices[pathKey]
+	if index >= len(blocks) {
+		return Block{}, false
+	}
+	i.tableIndices[pathKey] = index + 1
+	return blocks[index], true
 }
 
 func blockPathKey(path []string) string {
@@ -146,7 +164,7 @@ func parseTableEntries(body string) ([]tableEntry, string) {
 	var entries []tableEntry
 	var pending []string
 	var current *tableEntry
-	multilineDepth := 0
+	state := tableParseState{}
 
 	flushCurrent := func() {
 		if current == nil {
@@ -161,7 +179,7 @@ func parseTableEntries(body string) ([]tableEntry, string) {
 			continue
 		}
 		trimmed := strings.TrimSpace(line)
-		if multilineDepth == 0 {
+		if state.canStartEntry() {
 			if key, ok := parseRootKey(trimmed); ok {
 				flushCurrent()
 				current = &tableEntry{
@@ -169,19 +187,76 @@ func parseTableEntries(body string) ([]tableEntry, string) {
 					Text: strings.Join(append(pending, line), ""),
 				}
 				pending = nil
-				multilineDepth += bracketDelta(trimmed)
+				state.consumeLine(line)
 				continue
 			}
 		}
 		if current != nil {
 			current.Text += line
-			multilineDepth += bracketDelta(trimmed)
+			state.consumeLine(line)
 			continue
 		}
 		pending = append(pending, line)
+		state.consumeLine(line)
 	}
 	flushCurrent()
 	return entries, strings.Join(pending, "")
+}
+
+type tableParseState struct {
+	bracketDepth   int
+	multilineQuote string
+}
+
+func (s tableParseState) canStartEntry() bool {
+	return s.bracketDepth == 0 && s.multilineQuote == ""
+}
+
+func (s *tableParseState) consumeLine(line string) {
+	if line == "" {
+		return
+	}
+
+	quote := rune(0)
+	escaped := false
+	for i := 0; i < len(line); i++ {
+		if s.multilineQuote != "" {
+			if strings.HasPrefix(line[i:], s.multilineQuote) && !escaped {
+				i += len(s.multilineQuote) - 1
+				s.multilineQuote = ""
+			}
+			escaped = false
+			continue
+		}
+
+		r := rune(line[i])
+		switch {
+		case escaped:
+			escaped = false
+		case quote == '"' && r == '\\':
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case strings.HasPrefix(line[i:], `"""`):
+			s.multilineQuote = `"""`
+			i += 2
+		case strings.HasPrefix(line[i:], `'''`):
+			s.multilineQuote = `'''`
+			i += 2
+		case r == '"':
+			quote = r
+		case r == '\'':
+			quote = r
+		case r == '#':
+			return
+		case r == '[':
+			s.bracketDepth++
+		case r == ']':
+			s.bracketDepth--
+		}
+	}
 }
 
 func appendSection(b *strings.Builder, text string) {

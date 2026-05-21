@@ -93,6 +93,66 @@ b = [
 	}
 }
 
+func TestSynthesizeMergesArrayTableInstancesByOccurrence(t *testing.T) {
+	source := parseDoc(t, `[[plugins.instances]]
+name = "github"
+enabled = true
+`)
+	target := parseDoc(t, `[[plugins.instances]]
+name = "github"
+timeout = 5
+
+[[plugins.instances]]
+name = "slack"
+enabled = false
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `[[plugins.instances]]
+name = "github"
+
+enabled = true
+
+timeout = 5
+
+[[plugins.instances]]
+name = "slack"
+enabled = false
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestSynthesizeDoesNotSplitTripleQuotedTableValue(t *testing.T) {
+	source := parseDoc(t, `[foo]
+message = """
+left = right
+"""
+enabled = true
+`)
+	target := parseDoc(t, `[foo]
+message = """
+old = value
+"""
+extra = "keep"
+`)
+
+	got := Synthesize(source, target, nil).String()
+	want := `[foo]
+message = """
+left = right
+"""
+
+enabled = true
+
+extra = "keep"
+`
+	if got != want {
+		t.Fatalf("unexpected synthesized document\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestSynthesizePreservesProjectsFromTarget(t *testing.T) {
 	source := parseDoc(t, `model = "gpt-5.5"
 
