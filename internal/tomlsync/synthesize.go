@@ -64,7 +64,16 @@ func Synthesize(source, target Document, preserve []PreserveRule) Document {
 	appendedExtraRoot := false
 	for _, block := range source.Blocks {
 		if len(block.Path) > 0 && !appendedExtraRoot {
-			blocks = append(blocks, targetOnlyRootBlocks(targetIndex.rootOrder, seenRoot)...)
+			extra := targetOnlyRootBlocks(targetIndex.rootOrder, seenRoot)
+			if len(extra) > 0 && len(blocks) > 0 && blocks[len(blocks)-1].RootKV {
+				blocks[len(blocks)-1].Text = trimTrailingBlankLines(blocks[len(blocks)-1].Text)
+				for i := range extra {
+					if extra[i].RootKV {
+						extra[i].Text = trimTrailingBlankLines(extra[i].Text)
+					}
+				}
+			}
+			blocks = append(blocks, extra...)
 			appendedExtraRoot = true
 		}
 		switch {
@@ -120,6 +129,47 @@ func targetOnlyRootBlocks(rootOrder []Block, seenRoot map[string]struct{}) []Blo
 		blocks = append(blocks, block)
 	}
 	return blocks
+}
+
+func trimTrailingBlankLines(text string) string {
+	if text == "" {
+		return ""
+	}
+
+	i := len(text)
+	for i > 0 && text[i-1] == '\n' {
+		if i >= 2 && text[i-2] == '\r' {
+			i -= 2
+			continue
+		}
+		i--
+	}
+	suffix := text[i:]
+	if suffix == "" {
+		return text
+	}
+
+	newlineUnits := 0
+	for j := len(suffix); j > 0 && suffix[j-1] == '\n'; newlineUnits++ {
+		if j >= 2 && suffix[j-2] == '\r' {
+			j -= 2
+		} else {
+			j--
+		}
+	}
+	if newlineUnits <= 1 {
+		return text
+	}
+
+	keepLen := 1
+	if len(suffix) >= 2 && suffix[len(suffix)-2] == '\r' {
+		keepLen = 2
+	}
+	if len(suffix) <= keepLen {
+		return text
+	}
+
+	return text[:i] + suffix[len(suffix)-keepLen:]
 }
 
 type documentIndex struct {
@@ -329,10 +379,7 @@ func appendSection(b *strings.Builder, text string) {
 	if text == "" {
 		return
 	}
-	if b.Len() > 0 && !strings.HasPrefix(text, "\n") && !strings.HasSuffix(b.String(), "\n\n") {
-		if !strings.HasSuffix(b.String(), "\n") {
-			b.WriteByte('\n')
-		}
+	if b.Len() > 0 && !strings.HasPrefix(text, "\n") && !strings.HasSuffix(b.String(), "\n") {
 		b.WriteByte('\n')
 	}
 	b.WriteString(text)

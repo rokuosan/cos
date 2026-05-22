@@ -115,14 +115,61 @@ func ParseDocument(r io.Reader) (Document, error) {
 // String renders the document by concatenating its original text blocks.
 func (d Document) String() string {
 	var b strings.Builder
-	for i, block := range d.Blocks {
-		if i > 0 && block.Text != "" && b.Len() > 0 && !strings.HasSuffix(b.String(), "\n\n") {
-			if !strings.HasSuffix(b.String(), "\n") {
-				b.WriteByte('\n')
-			}
-			b.WriteByte('\n')
+	tail := ""
+	var prev Block
+	hasPrev := false
+
+	pushTail := func(text string) {
+		if text == "" {
+			return
+		}
+		if len(text) >= 4 {
+			tail = text[len(text)-4:]
+			return
+		}
+		combined := tail + text
+		if len(combined) > 4 {
+			combined = combined[len(combined)-4:]
+		}
+		tail = combined
+	}
+
+	endsWithNewline := func() bool {
+		return strings.HasSuffix(tail, "\n")
+	}
+	endsWithBlankLine := func() bool {
+		return strings.HasSuffix(tail, "\n\n") || strings.HasSuffix(tail, "\r\n\r\n")
+	}
+	newlineSeq := func() string {
+		if strings.HasSuffix(tail, "\r\n") {
+			return "\r\n"
+		}
+		return "\n"
+	}
+
+	ensureBlankLine := func() {
+		if endsWithBlankLine() {
+			return
+		}
+		nl := newlineSeq()
+		if endsWithNewline() {
+			b.WriteString(nl)
+			pushTail(nl)
+			return
+		}
+		b.WriteString(nl)
+		b.WriteString(nl)
+		pushTail(nl + nl)
+	}
+
+	for _, block := range d.Blocks {
+		if hasPrev && block.Text != "" && len(block.Path) > 0 && (b.Len() > 0 || prev.Text != "") {
+			ensureBlankLine()
 		}
 		b.WriteString(block.Text)
+		pushTail(block.Text)
+		prev = block
+		hasPrev = true
 	}
 	return b.String()
 }
