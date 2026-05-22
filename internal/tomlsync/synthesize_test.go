@@ -18,11 +18,8 @@ d = "D"
 
 	got := Synthesize(source, target, nil).String()
 	want := `a = "A"
-
 b = "B"
-
 c = "C"
-
 d = "D"
 `
 	if got != want {
@@ -52,12 +49,10 @@ e = "E"
 	got := Synthesize(source, target, nil).String()
 	want := `[foo]
 a = "A"
-
 b = "B"
 
 [foo.bar]
 c = "C"
-
 d = "D"
 
 [foo.baz]
@@ -82,7 +77,6 @@ b = [
 	got := Synthesize(source, target, nil).String()
 	want := `[foo]
 a = "A"
-
 # keep me
 b = [
   "B",
@@ -136,7 +130,6 @@ approval_policy = "never"
 
 	got := Synthesize(source, target, nil).String()
 	want := `model = "gpt-5.5"
-
 approval_policy = "never"
 
 [features]
@@ -164,9 +157,7 @@ enabled = false
 	got := Synthesize(source, target, nil).String()
 	want := `[[plugins.instances]]
 name = "github"
-
 enabled = true
-
 timeout = 5
 
 [[plugins.instances]]
@@ -197,9 +188,7 @@ extra = "keep"
 message = """
 left = right
 """
-
 enabled = true
-
 extra = "keep"
 `
 	if got != want {
@@ -228,9 +217,7 @@ message = """
 keep \""" inside
 still here
 """
-
 enabled = true
-
 extra = "keep"
 `
 	if got != want {
@@ -296,7 +283,6 @@ approval_policy = "never"
 
 	got := Synthesize(source, target, []PreserveRule{"approval_policy"}).String()
 	want := `model = "gpt-5.5"
-
 approval_policy = "never"
 `
 	if got != want {
@@ -330,7 +316,6 @@ apps = true
 
 	got := Synthesize(source, target, []PreserveRule{"approval_policy"}).String()
 	want := `model = "gpt-5.5"
-
 approval_policy = "never"
 
 [features]
